@@ -1,0 +1,32 @@
+prometheus:
+  url: http://prometheus-server.monitoring.svc
+  port: 80
+  path: ""
+
+rules:
+  default: true
+  custom:
+  - seriesQuery: '{__name__=~"jvm_memory_.*"}'
+    resources:
+      overrides:
+        kubernetes_namespace:
+          resource: namespace
+        kubernetes_pod_name:
+          resource: pod
+    name:
+      matches: "^jvm_memory_used_bytes(.*)"
+      as: "jvm_memory_percentage"
+    metricsQuery: (sum(jvm_memory_used_bytes{area="heap"})  by (<<.GroupBy>>) / sum(jvm_memory_max_bytes{area="heap"})  by (<<.GroupBy>>)) * 100
+  - seriesQuery: '{__name__=~"^http_server_requests_seconds_.*"}'
+    resources:
+      overrides:
+        kubernetes_namespace:
+          resource: namespace
+        kubernetes_pod_name:
+          resource: pod
+    name:
+      matches: "^http_server_requests_seconds_count(.*)"
+      as: "http_server_requests_seconds_count_sum"
+    metricsQuery: sum(<<.Series>>{<<.LabelMatchers>>,uri=~"/api/v1/labs"}) by (<<.GroupBy>>)
+
+    $ kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/app/pods/*/http_server_requests_seconds_count_sum" | jq .
